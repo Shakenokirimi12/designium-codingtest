@@ -1,13 +1,3 @@
-/**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `npm run deploy` to publish your worker
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
-
 import { headerBuilder } from "./modules/headerBuilder.mjs";
 
 export default {
@@ -61,7 +51,7 @@ export default {
 					const token = btoa(userEmail);//generate token for now roughly
 					return new Response({
 						"token": token
-					}, await headerBuilder(401));
+					}, await headerBuilder(200));
 				}
 				else {
 					return new Response({ "error": "Authentication failed.", "message": "You can not log in to service. Maybe you entered wrong password or email?" }, await headerBuilder(401));
