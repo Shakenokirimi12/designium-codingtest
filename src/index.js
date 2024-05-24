@@ -140,7 +140,12 @@ export default {
 			}
 		}
 		else {
-			return new Response({ "error": "Pathname is wrong.", "message": "Specified pathname not found in this server..." }, await headerBuilder(404))
+			if (request.method == "GET") {
+				return new Response(JSON.stringify({ "error": "Pathname is wrong.", "message": "Specified pathname not found in this server..." }), await headerBuilder(404))
+			}
+			else {
+				return new Response({ "error": "Pathname is wrong.", "message": "Specified pathname not found in this server..." }, await headerBuilder(404))
+			}
 		}
 	},
 };
