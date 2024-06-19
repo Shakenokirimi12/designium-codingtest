@@ -13,28 +13,43 @@ export default {
 					let userName = data.name;
 					let userEmail = data.email;
 					let userPassword = data.password;
-					const id = btoa(userEmail + userName);//generate id roughly for now
-					try {
-						const { results: queryresult } = await env.DATABASE.prepare(
-							"SELECT * FROM Users WHERE userId = ?"
-						).bind(id).all();
-						if (queryresult.length != 0) {
-							return new Response(JSON.stringify({ "error": "multiple account", "message": "You have multiple account on server. Please contact support." }), await headerBuilder(500))
+					let validateResult = validatePassword(userPassword);
+					let isPasswordOkay
+					switch (validateResult) {
+						case 'Okay':
+							isPasswordOkay = true;
+							break;
+						default:
+							isPasswordOkay = false;
+							break;
+					}
+					if (isPasswordOkay) {
+						const id = btoa(userEmail + userName);//generate id roughly for now
+						try {
+							const { results: queryresult } = await env.DATABASE.prepare(
+								"SELECT * FROM Users WHERE userId = ?"
+							).bind(id).all();
+							if (queryresult.length != 0) {
+								return new Response(JSON.stringify({ "error": "multiple account", "message": "You have multiple account on server. Please contact support." }), await headerBuilder(500))
+							}
+							else if (queryresult.length == 0) {
+								await env.DATABASE.prepare(
+									"INSERT INTO Users VALUES(?,?,?,?)"
+								).bind(id, userName, userEmail, userPassword)
+									.run();
+								return new Response(JSON.stringify({
+									"id": id,
+									"name": userName,
+									"email": userEmail
+								}), await headerBuilder(201));
+							}
 						}
-						else if (queryresult.length == 0) {
-							await env.DATABASE.prepare(
-								"INSERT INTO Users VALUES(?,?,?,?)"
-							).bind(id, userName, userEmail, userPassword)
-								.run();
-							return new Response(JSON.stringify({
-								"id": id,
-								"name": userName,
-								"email": userEmail
-							}), await headerBuilder(201));
+						catch (error) {
+							return new Response(JSON.stringify({ "error": "Database error.", "message": error }), await headerBuilder(500))
 						}
 					}
-					catch (error) {
-						return new Response(JSON.stringify({ "error": "Database error.", "message": error }), await headerBuilder(500))
+					else {
+						return new Response(JSON.stringify({ "error": "Password is not valid.", "message": validateResult }), await headerBuilder(400))
 					}
 				}
 				catch (error) { //when failed to get parameters in request json
@@ -55,15 +70,28 @@ export default {
 					const data = await request.json();
 					let userEmail = data.email;
 					let userPassword = data.password;
-					//何らかの処理
-					if (true) {
-						const token = btoa(userEmail);//generate token for now roughly
-						return new Response(JSON.stringify({
-							"token": token
-						}), await headerBuilder(200));
+					try {
+						const { results: queryresult } = await env.DATABASE.prepare(
+							"SELECT * FROM Users WHERE userEmail = ?"
+						).bind(userEmail).all();
+						if (queryresult.length != 0) {
+							if (queryresult[0].userPassword == userPassword) {
+								const token = btoa(userEmail);//generate token for now roughly
+								return new Response(JSON.stringify({
+									"token": token
+								}), await headerBuilder(200));
+							}
+							else {
+								return new Response(JSON.stringify({ "error": "Authentication failed.", "message": "You can not log in to service. Maybe you entered wrong password or email?" }), await headerBuilder(401));
+							}
+						}
+						else {
+							return new Response(JSON.stringify({ "error": "Authentication failed.", "message": "You can not log in to service. Maybe you entered wrong password or email?" }), await headerBuilder(401));
+
+						}
 					}
-					else {
-						return new Response(JSON.stringify({ "error": "Authentication failed.", "message": "You can not log in to service. Maybe you entered wrong password or email?" }), await headerBuilder(401));
+					catch (error) {
+						return new Response(JSON.stringify({ "error": "Database error.", "message": error }), await headerBuilder(500))
 					}
 				}
 				catch (error) {
@@ -189,3 +217,24 @@ export default {
 		}
 	},
 };
+
+
+function validatePassword(password) {
+	const hasUpperCase = /[A-Z]/.test(password);
+	const hasLowerCase = /[a-z]/.test(password);
+	const hasDigit = /\d/.test(password);
+
+	if (password.length < 8 || password.length > 20) {
+		return `Password must be between 8 and 20 characters long.`;
+	}
+	if (!hasUpperCase) {
+		return 'Password must contain at least one uppercase letter.';
+	}
+	if (!hasLowerCase) {
+		return 'Password must contain at least one lowercase letter.';
+	}
+	if (!hasDigit) {
+		return 'Password must contain at least one digit.';
+	}
+	return 'Okay';
+}
